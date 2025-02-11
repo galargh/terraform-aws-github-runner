@@ -14,7 +14,7 @@ type Repository = GetResponseDataTypeFromEndpointMethod<Octokit['repos']['get']>
 
 export interface PoolEvent {
   poolSize: number;
-  dynamicPoolScalingEnabled: boolean;
+  dynamicPoolScalingEnabled?: boolean;
 }
 
 interface RunnerStatus {
@@ -49,7 +49,7 @@ export async function adjust(event: PoolEvent): Promise<void> {
   const instanceMaxSpotPrice = process.env.INSTANCE_MAX_SPOT_PRICE;
   const instanceAllocationStrategy = process.env.INSTANCE_ALLOCATION_STRATEGY || 'lowest-price'; // same as AWS default
   // RUNNER_OWNERS is a comma-split list of owners, which might be either org or repo owners
-  const runnerOwners = process.env.RUNNER_OWNERS.split(',');
+  const runnerOwners = (process.env.RUNNER_OWNERS ?? process.env.RUNNER_OWNER).split(',');
   const amiIdSsmParameterName = process.env.AMI_ID_SSM_PARAMETER_NAME;
   const tracingEnabled = yn(process.env.POWERTOOLS_TRACE_ENABLED, { default: false });
   const onDemandFailoverOnError = process.env.ENABLE_ON_DEMAND_FAILOVER_FOR_ERRORS
@@ -102,7 +102,7 @@ export async function adjust(event: PoolEvent): Promise<void> {
       runnerType,
       runnerLabels,
       event.poolSize,
-      event.dynamicPoolScalingEnabled,
+      event.dynamicPoolScalingEnabled ?? true,
     );
 
     if (currentPoolSize >= targetPoolSize) {
