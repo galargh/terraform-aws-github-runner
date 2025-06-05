@@ -345,8 +345,14 @@ export async function scaleUp(eventSource: string, payload: ActionRequestMessage
           throw new ScaleError('No runners create: maximum of runners reached.');
         }
       }
-    } finally {
       await publishRetryMessage(payload);
+    } catch (error) {
+      const publishedRetryMessage = await publishRetryMessage(payload);
+      if (publishedRetryMessage) {
+        logger.info('The scaling up attempt failed, but a retry message was published.', { error });
+      } else {
+        throw error;
+      }
     }
   } else {
     logger.info('No runner will be created, job is not queued.');
