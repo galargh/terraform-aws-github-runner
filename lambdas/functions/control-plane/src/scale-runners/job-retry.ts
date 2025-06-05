@@ -13,10 +13,10 @@ interface JobRetryConfig {
   queueUrl: string;
 }
 
-export async function publishRetryMessage(payload: ActionRequestMessage): Promise<void> {
+export async function publishRetryMessage(payload: ActionRequestMessage): Promise<boolean> {
   if (process.env.JOB_RETRY_CONFIG === undefined) {
     logger.debug('Job retry config not found, skipping retry');
-    return;
+    return false;
   }
 
   const jobRetryConfig = JSON.parse(process.env.JOB_RETRY_CONFIG) as JobRetryConfig;
@@ -31,8 +31,10 @@ export async function publishRetryMessage(payload: ActionRequestMessage): Promis
     delay = Math.min(delay, 900); // max delay of 15 minutes
     await publishMessage(JSON.stringify(payload), jobRetryConfig.queueUrl, delay);
     logger.info(`Messages published for retry check with a delay of: '${delay}' seconds`);
+    return true;
   } else {
     logger.debug(`Job retry is disabled or max attempts reached, skipping retry`, { payload });
+    return false;
   }
 }
 

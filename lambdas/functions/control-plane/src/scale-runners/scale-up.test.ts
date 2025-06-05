@@ -141,7 +141,7 @@ beforeEach(() => {
     },
   ]);
   mockPublishRetryMessage.mockImplementation(async () => {
-    return;
+    return false;
   });
 
   mockedAppAuth.mockResolvedValue({
@@ -367,6 +367,23 @@ describe('scaleUp with GHES', () => {
       expect(publishRetryMessage).not.toBeCalled();
     });
 
+    it('throws an error when the retry message is not published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
+    });
+
+    it('does not throw an error when the retry message is published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      mockPublishRetryMessage.mockImplementation(async () => {
+        return true;
+      });
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
+    });
+
     it.each(RUNNER_TYPES)(
       'calls create start runner config of 40' + ' instances (ssm rate limit condition) to test time delay ',
       async (type: RunnerType) => {
@@ -523,6 +540,23 @@ describe('scaleUp with GHES', () => {
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
     });
+
+    it('throws an error when the retry message is not published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
+    });
+
+    it('does not throw an error when the retry message is published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      mockPublishRetryMessage.mockImplementation(async () => {
+        return true;
+      });
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
+    });
   });
 });
 
@@ -624,6 +658,23 @@ describe('scaleUp with public GH', () => {
       }));
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
+    });
+
+    it('throws an error when the retry message is not published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
+    });
+
+    it('does not throw an error when the retry message is published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      mockPublishRetryMessage.mockImplementation(async () => {
+        return true;
+      });
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
   });
 
@@ -809,6 +860,23 @@ describe('scaleUp with public GH', () => {
       }));
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
+    });
+
+    it('throws an error when the retry message is not published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
+    });
+
+    it('does not throw an error when the retry message is published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      mockPublishRetryMessage.mockImplementation(async () => {
+        return true;
+      });
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
   });
 });
@@ -1016,6 +1084,23 @@ describe('scaleUp with Github Data Residency', () => {
       expect(publishRetryMessage).not.toBeCalled();
     });
 
+    it('throws an error when the retry message is not published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
+    });
+
+    it('does not throw an error when the retry message is published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      mockPublishRetryMessage.mockImplementation(async () => {
+        return true;
+      });
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
+    });
+
     it.each(RUNNER_TYPES)(
       'calls create start runner config of 40' + ' instances (ssm rate limit condition) to test time delay ',
       async (type: RunnerType) => {
@@ -1171,6 +1256,23 @@ describe('scaleUp with Github Data Residency', () => {
       }));
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
+    });
+
+    it('throws an error when the retry message is not published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
+    });
+
+    it('does not throw an error when the retry message is published', async () => {
+      process.env.RUNNERS_MAXIMUM_COUNT = '1';
+      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
+      mockPublishRetryMessage.mockImplementation(async () => {
+        return true;
+      });
+      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
+      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
   });
 });
