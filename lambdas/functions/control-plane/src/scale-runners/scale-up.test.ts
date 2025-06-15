@@ -169,11 +169,6 @@ describe('scaleUp with GHES', () => {
     process.env.GHES_URL = 'https://github.enterprise.something';
   });
 
-  it('ignores non-sqs events', async () => {
-    expect.assertions(1);
-    await expect(scaleUpModule.scaleUp('aws:s3', TEST_DATA)).rejects.toEqual(Error('Cannot handle non-SQS events!'));
-  });
-
   it('checks queued workflows', async () => {
     await scaleUpModule.scaleUp('aws:sqs', TEST_DATA);
     expect(mockOctokit.actions.getJobForWorkflowRun).toBeCalledWith({
@@ -344,20 +339,6 @@ describe('scaleUp with GHES', () => {
       expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
 
-    it('tries to publish a retry message when runner creation fails', async () => {
-      const mockCreateRunners = vi.mocked(createRunner);
-      mockCreateRunners.mockRejectedValue(new Error('no retry'));
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('tries to publish a retry message when maximum runners has been reached', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'false';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
     it('does not publish a retry message when the job is not queued', async () => {
       process.env.ENABLE_JOB_QUEUED_CHECK = 'true';
       mockOctokit.actions.getJobForWorkflowRun.mockImplementation(() => ({
@@ -365,23 +346,6 @@ describe('scaleUp with GHES', () => {
       }));
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
-    });
-
-    it('throws an error when the retry message is not published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('does not throw an error when the retry message is published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      mockPublishRetryMessage.mockImplementation(async () => {
-        return true;
-      });
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
 
     it.each(RUNNER_TYPES)(
@@ -519,19 +483,6 @@ describe('scaleUp with GHES', () => {
       expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
 
-    it('tries to publish a retry message when runner creation fails', async () => {
-      const mockCreateRunners = vi.mocked(createRunner);
-      mockCreateRunners.mockRejectedValue(new Error('no retry'));
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('tries to publish a retry message when maximum runners has been reached', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
     it('does not publish a retry message when the job is not queued', async () => {
       process.env.ENABLE_JOB_QUEUED_CHECK = 'true';
       mockOctokit.actions.getJobForWorkflowRun.mockImplementation(() => ({
@@ -540,32 +491,10 @@ describe('scaleUp with GHES', () => {
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
     });
-
-    it('throws an error when the retry message is not published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('does not throw an error when the retry message is published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      mockPublishRetryMessage.mockImplementation(async () => {
-        return true;
-      });
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
   });
 });
 
 describe('scaleUp with public GH', () => {
-  it('ignores non-sqs events', async () => {
-    expect.assertions(1);
-    await expect(scaleUpModule.scaleUp('aws:s3', TEST_DATA)).rejects.toEqual(Error('Cannot handle non-SQS events!'));
-  });
-
   it('checks queued workflows', async () => {
     await scaleUpModule.scaleUp('aws:sqs', TEST_DATA);
     expect(mockOctokit.actions.getJobForWorkflowRun).toBeCalledWith({
@@ -638,19 +567,6 @@ describe('scaleUp with public GH', () => {
       expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
 
-    it('tries to publish a retry message when runner creation fails', async () => {
-      const mockCreateRunners = vi.mocked(createRunner);
-      mockCreateRunners.mockRejectedValue(new Error('no retry'));
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('tries to publish a retry message when maximum runners has been reached', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
     it('does not publish a retry message when the job is not queued', async () => {
       process.env.ENABLE_JOB_QUEUED_CHECK = 'true';
       mockOctokit.actions.getJobForWorkflowRun.mockImplementation(() => ({
@@ -658,23 +574,6 @@ describe('scaleUp with public GH', () => {
       }));
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
-    });
-
-    it('throws an error when the retry message is not published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('does not throw an error when the retry message is published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      mockPublishRetryMessage.mockImplementation(async () => {
-        return true;
-      });
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
   });
 
@@ -840,19 +739,6 @@ describe('scaleUp with public GH', () => {
       expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
 
-    it('tries to publish a retry message when runner creation fails', async () => {
-      const mockCreateRunners = vi.mocked(createRunner);
-      mockCreateRunners.mockRejectedValue(new Error('no retry'));
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('tries to publish a retry message when maximum runners has been reached', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
     it('does not publish a retry message when the job is not queued', async () => {
       process.env.ENABLE_JOB_QUEUED_CHECK = 'true';
       mockOctokit.actions.getJobForWorkflowRun.mockImplementation(() => ({
@@ -861,34 +747,12 @@ describe('scaleUp with public GH', () => {
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
     });
-
-    it('throws an error when the retry message is not published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('does not throw an error when the retry message is published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      mockPublishRetryMessage.mockImplementation(async () => {
-        return true;
-      });
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
   });
 });
 
 describe('scaleUp with Github Data Residency', () => {
   beforeEach(() => {
     process.env.GHES_URL = 'https://companyname.ghe.com';
-  });
-
-  it('ignores non-sqs events', async () => {
-    expect.assertions(1);
-    await expect(scaleUpModule.scaleUp('aws:s3', TEST_DATA)).rejects.toEqual(Error('Cannot handle non-SQS events!'));
   });
 
   it('checks queued workflows', async () => {
@@ -1061,20 +925,6 @@ describe('scaleUp with Github Data Residency', () => {
       expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
 
-    it('tries to publish a retry message when runner creation fails', async () => {
-      const mockCreateRunners = vi.mocked(createRunner);
-      mockCreateRunners.mockRejectedValue(new Error('no retry'));
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('tries to publish a retry message when maximum runners has been reached', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'false';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
     it('does not publish a retry message when the job is not queued', async () => {
       process.env.ENABLE_JOB_QUEUED_CHECK = 'true';
       mockOctokit.actions.getJobForWorkflowRun.mockImplementation(() => ({
@@ -1082,23 +932,6 @@ describe('scaleUp with Github Data Residency', () => {
       }));
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
-    });
-
-    it('throws an error when the retry message is not published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('does not throw an error when the retry message is published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      mockPublishRetryMessage.mockImplementation(async () => {
-        return true;
-      });
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
 
     it.each(RUNNER_TYPES)(
@@ -1236,19 +1069,6 @@ describe('scaleUp with Github Data Residency', () => {
       expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
 
-    it('tries to publish a retry message when runner creation fails', async () => {
-      const mockCreateRunners = vi.mocked(createRunner);
-      mockCreateRunners.mockRejectedValue(new Error('no retry'));
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('tries to publish a retry message when maximum runners has been reached', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
     it('does not publish a retry message when the job is not queued', async () => {
       process.env.ENABLE_JOB_QUEUED_CHECK = 'true';
       mockOctokit.actions.getJobForWorkflowRun.mockImplementation(() => ({
@@ -1256,23 +1076,6 @@ describe('scaleUp with Github Data Residency', () => {
       }));
       await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
       expect(publishRetryMessage).not.toBeCalled();
-    });
-
-    it('throws an error when the retry message is not published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).rejects.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
-    });
-
-    it('does not throw an error when the retry message is published', async () => {
-      process.env.RUNNERS_MAXIMUM_COUNT = '1';
-      process.env.ENABLE_EPHEMERAL_RUNNERS = 'true';
-      mockPublishRetryMessage.mockImplementation(async () => {
-        return true;
-      });
-      await expect(scaleUpModule.scaleUp('aws:sqs', TEST_DATA)).resolves.not.toThrow();
-      expect(publishRetryMessage).toBeCalledWith(TEST_DATA);
     });
   });
 });

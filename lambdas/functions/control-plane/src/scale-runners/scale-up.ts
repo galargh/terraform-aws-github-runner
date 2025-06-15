@@ -224,10 +224,9 @@ export async function createRunners(
   }
 }
 
-export async function scaleUp(eventSource: string, payload: ActionRequestMessage): Promise<void> {
+export async function scaleUp(_: string, payload: ActionRequestMessage): Promise<void> {
   logger.info(`Received ${payload.eventType} from ${payload.repositoryOwner}/${payload.repositoryName}`);
 
-  if (eventSource !== 'aws:sqs') throw Error('Cannot handle non-SQS events!');
   const enableOrgLevel = yn(process.env.ENABLE_ORGANIZATION_RUNNERS, { default: true });
   const maximumRunners = parseInt(process.env.RUNNERS_MAXIMUM_COUNT || '3');
   const runnerLabels = process.env.RUNNER_LABELS || '';
@@ -305,53 +304,45 @@ export async function scaleUp(eventSource: string, payload: ActionRequestMessage
       scaleUp = currentRunners.length < maximumRunners;
     }
 
-    try {
-      if (scaleUp) {
-        logger.info(`Attempting to launch a new runner`);
+    if (scaleUp) {
+      logger.info(`Attempting to launch a new runner`);
 
-        await createRunners(
-          {
-            ephemeral,
-            enableJitConfig,
-            ghesBaseUrl,
-            runnerLabels,
-            runnerGroup,
-            runnerNamePrefix,
-            runnerOwner,
-            runnerType,
-            disableAutoUpdate,
-            ssmTokenPath,
-            ssmConfigPath,
+      await createRunners(
+        {
+          ephemeral,
+          enableJitConfig,
+          ghesBaseUrl,
+          runnerLabels,
+          runnerGroup,
+          runnerNamePrefix,
+          runnerOwner,
+          runnerType,
+          disableAutoUpdate,
+          ssmTokenPath,
+          ssmConfigPath,
+        },
+        {
+          ec2instanceCriteria: {
+            instanceTypes,
+            targetCapacityType: instanceTargetCapacityType,
+            maxSpotPrice: instanceMaxSpotPrice,
+            instanceAllocationStrategy: instanceAllocationStrategy,
           },
-          {
-            ec2instanceCriteria: {
-              instanceTypes,
-              targetCapacityType: instanceTargetCapacityType,
-              maxSpotPrice: instanceMaxSpotPrice,
-              instanceAllocationStrategy: instanceAllocationStrategy,
-            },
-            environment,
-            launchTemplateName,
-            subnets,
-            amiIdSsmParameterName,
-            tracingEnabled,
-            onDemandFailoverOnError,
-          },
-          githubInstallationClient,
-        );
-      } else {
-        logger.info('No runner will be created, maximum number of runners reached.');
-        if (ephemeral) {
-          throw new ScaleError('No runners create: maximum of runners reached.');
-        }
-      }
+          environment,
+          launchTemplateName,
+          subnets,
+          amiIdSsmParameterName,
+          tracingEnabled,
+          onDemandFailoverOnError,
+        },
+        githubInstallationClient,
+      );
+
       await publishRetryMessage(payload);
-    } catch (error) {
-      const publishedRetryMessage = await publishRetryMessage(payload);
-      if (publishedRetryMessage) {
-        logger.info('The scaling up attempt failed, but a retry message was published.', { error });
-      } else {
-        throw error;
+    } else {
+      logger.info('No runner will be created, maximum number of runners reached.');
+      if (ephemeral) {
+        throw new ScaleError('No runners create: maximum of runners reached.');
       }
     }
   } else {

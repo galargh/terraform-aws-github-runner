@@ -6,9 +6,9 @@ import { Context, SQSEvent } from 'aws-lambda';
 import { PoolEvent, adjust } from './pool/pool';
 import ScaleError from './scale-runners/ScaleError';
 import { scaleDown } from './scale-runners/scale-down';
-import { scaleUp } from './scale-runners/scale-up';
+import { ActionRequestMessage, scaleUp } from './scale-runners/scale-up';
 import { SSMCleanupOptions, cleanSSMTokens } from './scale-runners/ssm-housekeeper';
-import { checkAndRetryJob } from './scale-runners/job-retry';
+import { checkAndRetryJob, publishRetryMessage } from './scale-runners/job-retry';
 
 export async function scaleUpHandler(event: SQSEvent, context: Context): Promise<void> {
   setContext(context, 'lambda.ts');
@@ -19,11 +19,29 @@ export async function scaleUpHandler(event: SQSEvent, context: Context): Promise
     return Promise.resolve();
   }
 
+  let eventSource: string;
+  let payload: ActionRequestMessage;
+
   try {
-    await scaleUp(event.Records[0].eventSource, JSON.parse(event.Records[0].body));
+    eventSource = event.Records[0].eventSource;
+    payload = JSON.parse(event.Records[0].body);
+  } catch (e) {
+    logger.warn(`Ignoring error: ${e}`);
+    return Promise.resolve();
+  }
+
+  if (eventSource !== 'aws:SQS') {
+    logger.warn('Event ignored, only SQS events can be handled.');
+    return Promise.resolve();
+  }
+
+  try {
+    await scaleUp(eventSource, payload);
     return Promise.resolve();
   } catch (e) {
-    if (e instanceof ScaleError) {
+    const retryMessagePublished = await publishRetryMessage(payload);
+
+    if (e instanceof ScaleError && !retryMessagePublished) {
       return Promise.reject(e);
     } else {
       logger.warn(`Ignoring error: ${e}`);

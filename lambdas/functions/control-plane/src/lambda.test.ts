@@ -7,7 +7,7 @@ import ScaleError from './scale-runners/ScaleError';
 import { scaleDown } from './scale-runners/scale-down';
 import { ActionRequestMessage, scaleUp } from './scale-runners/scale-up';
 import { cleanSSMTokens } from './scale-runners/ssm-housekeeper';
-import { checkAndRetryJob } from './scale-runners/job-retry';
+import { checkAndRetryJob, publishRetryMessage } from './scale-runners/job-retry';
 import { describe, it, expect, vi, MockedFunction } from 'vitest';
 
 const body: ActionRequestMessage = {
@@ -36,8 +36,17 @@ const sqsRecord: SQSRecord = {
   receiptHandle: '',
 };
 
+const nonSqsREcord: SQSRecord = {
+  ...sqsRecord,
+  eventSource: 'aws:s3',
+};
+
 const sqsEvent: SQSEvent = {
   Records: [sqsRecord],
+};
+
+const nonSqsEvent: SQSEvent = {
+  Records: [nonSqsREcord],
 };
 
 const context: Context = {
@@ -61,15 +70,30 @@ const context: Context = {
   },
 };
 
+const mockScaleUp = vi.mocked(scaleUp);
+const mockPublishRetryMessage = vi.mocked(publishRetryMessage);
+
 vi.mock('./pool/pool');
 vi.mock('./scale-runners/scale-down');
-vi.mock('./scale-runners/scale-up');
+vi.mock('./scale-runners/scale-up', async () => ({
+  scaleUp: vi.fn(),
+}));
 vi.mock('./scale-runners/ssm-housekeeper');
-vi.mock('./scale-runners/job-retry');
+vi.mock('./scale-runners/job-retry', async () => ({
+  publishRetryMessage: vi.fn(),
+}));
 vi.mock('@aws-github-runner/aws-powertools-util');
 vi.mock('@aws-github-runner/aws-ssm-util');
 
 describe('Test scale up lambda wrapper.', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+
+    mockScaleUp.mockReturnValue(Promise.resolve());
+    mockPublishRetryMessage.mockReturnValue(Promise.resolve(false));
+  });
+
   it('Do not handle multiple record sets.', async () => {
     await testInvalidRecords([sqsRecord, sqsRecord]);
   });
@@ -78,31 +102,38 @@ describe('Test scale up lambda wrapper.', () => {
     await testInvalidRecords([]);
   });
 
+  it('Do not handle non-sqs events.', async () => {
+    const error = new ScaleError('Scale should be rejected');
+    mockScaleUp.mockRejectedValue(error);
+    await expect(scaleUpHandler(nonSqsEvent, context)).resolves.not.toThrow();
+    expect(scaleUp).not.toHaveBeenCalled();
+  });
+
   it('Scale without error should resolve.', async () => {
-    const mock = vi.fn(scaleUp);
-    mock.mockImplementation(() => {
-      return new Promise((resolve) => {
-        resolve();
-      });
-    });
     await expect(scaleUpHandler(sqsEvent, context)).resolves.not.toThrow();
+    expect(scaleUp).toHaveBeenCalledOnce();
   });
 
   it('Non scale should resolve.', async () => {
     const error = new Error('Non scale should resolve.');
-    const mock = vi.fn(scaleUp);
-    mock.mockRejectedValue(error);
+    mockScaleUp.mockRejectedValue(error);
     await expect(scaleUpHandler(sqsEvent, context)).resolves.not.toThrow();
+    expect(publishRetryMessage).toHaveBeenCalledOnce();
   });
 
   it('Scale should be rejected', async () => {
     const error = new ScaleError('Scale should be rejected');
-    const mock = vi.fn() as MockedFunction<typeof scaleUp>;
-    mock.mockImplementation(() => {
-      return Promise.reject(error);
-    });
-    vi.mocked(scaleUp).mockImplementation(mock);
+    mockScaleUp.mockRejectedValue(error);
     await expect(scaleUpHandler(sqsEvent, context)).rejects.toThrow(error);
+    expect(publishRetryMessage).toHaveBeenCalledOnce();
+  });
+
+  it('Scale should resolve if retry message is published', async () => {
+    const error = new ScaleError('Scale should be rejected');
+    mockScaleUp.mockRejectedValue(error);
+    mockPublishRetryMessage.mockReturnValue(Promise.resolve(true));
+    await expect(scaleUpHandler(sqsEvent, context)).resolves.not.toThrow();
+    expect(publishRetryMessage).toHaveBeenCalledOnce();
   });
 });
 
