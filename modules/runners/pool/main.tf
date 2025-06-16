@@ -215,8 +215,8 @@ resource "aws_scheduler_schedule" "pool" {
     arn      = aws_lambda_function.pool.arn
     role_arn = aws_iam_role.scheduler.arn
     input = jsonencode({
-      poolSize                     = each.value.size
-      dynamic_pool_scaling_enabled = each.value.dynamic_pool_scaling_enabled
+      poolSize                  = each.value.size
+      dynamicPoolScalingEnabled = each.value.dynamic_pool_scaling_enabled
     })
   }
 }
