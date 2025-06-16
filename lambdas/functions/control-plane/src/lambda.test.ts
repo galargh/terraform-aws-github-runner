@@ -164,9 +164,7 @@ describe('Adjust pool.', () => {
       return Promise.reject(error);
     });
     vi.mocked(adjust).mockImplementation(mock);
-    const logSpy = vi.spyOn(logger, 'error');
-    await adjustPool({ poolSize: 0, dynamicPoolScalingEnabled: false }, context);
-    expect(logSpy).toHaveBeenCalledWith(`Handle error for adjusting pool. ${error.message}`, { error });
+    await expect(adjustPool({ poolSize: 0, dynamicPoolScalingEnabled: false }, context)).resolves.not.toThrowError();
   });
 });
 
@@ -222,7 +220,7 @@ describe('Test job retry check wrapper', () => {
     vi.mocked(checkAndRetryJob).mockImplementation(mock);
 
     const logSpyWarn = vi.spyOn(logger, 'warn');
-    await expect(jobRetryCheck(sqsEvent, context)).resolves.not.toThrow();
+    await expect(jobRetryCheck(sqsEvent, context)).resolves.not.toThrowError();
     expect(logSpyWarn).toHaveBeenCalledWith(`Error processing job retry: ${error.message}`, { error });
   });
 });

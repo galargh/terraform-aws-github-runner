@@ -168,6 +168,7 @@ function calculateCurrentPoolSize(ec2runners: RunnerList[], runnerStatus: Map<st
     } else if (runnerStatus.get(ec2Instance.instanceId) != null) {
       logger.debug(`Runner ${ec2Instance.instanceId} is not idle in GitHub and NOT counted as part of the pool`);
     } else if (!bootTimeExceeded(ec2Instance)) {
+      console.log('bootTimeExceeded false');
       numberOfRunnersInPool++;
       logger.info(`Runner ${ec2Instance.instanceId} is still booting and counted as part of the pool`);
     } else {

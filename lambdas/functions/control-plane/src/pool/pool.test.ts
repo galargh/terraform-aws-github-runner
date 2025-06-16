@@ -5,8 +5,10 @@ import * as nock from 'nock';
 import { listEC2Runners } from '../aws/runners';
 import * as ghAuth from '../github/auth';
 import { createRunners, getGitHubEnterpriseApiUrl } from '../scale-runners/scale-up';
-import { adjust, getNumberOfQueuedJobs } from './pool';
+import * as pool from './pool';
 import { describe, it, expect, beforeEach, vi, MockedClass } from 'vitest';
+
+const { adjust, getNumberOfQueuedJobs } = pool;
 
 const mockOctokit = {
   paginate: (f: (arg0: unknown) => unknown[], o: unknown) => f(o),
@@ -28,11 +30,13 @@ vi.mock('@octokit/rest', () => ({
   Octokit: vi.fn().mockImplementation(() => mockOctokit),
 }));
 
-vi.mock('./../aws/runners', async () => ({
-  listEC2Runners: vi.fn(),
-  // Include any other functions from the module that might be used
-  bootTimeExceeded: vi.fn(),
-}));
+vi.mock('./../aws/runners', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    listEC2Runners: vi.fn(),
+  };
+});
 vi.mock('./../github/auth', async () => ({
   createGithubAppAuth: vi.fn(),
   createGithubInstallationAuth: vi.fn(),
@@ -54,7 +58,7 @@ const mockedAppAuth = vi.mocked(ghAuth.createGithubAppAuth);
 const mockedInstallationAuth = vi.mocked(ghAuth.createGithubInstallationAuth);
 const mockCreateClient = vi.mocked(ghAuth.createOctokitClient);
 const mockListRunners = vi.mocked(listEC2Runners);
-const mockGetNumberOfQueuedJobs = vi.mocked(getNumberOfQueuedJobs);
+const mockGetNumberOfQueuedJobs = vi.spyOn(pool, 'getNumberOfQueuedJobs');
 
 const cleanEnv = process.env;
 
@@ -252,12 +256,14 @@ describe('Test simple pool.', () => {
         },
       ]);
 
-      // 2 idle + 1 booting = 3, top up with 2 to match a pool of 5
+      // 2 idle + 1 booting = 3, top up with 1 to match a pool of 5
       await adjust({ poolSize: 5, dynamicPoolScalingEnabled: false });
       expect(createRunners).toHaveBeenCalled();
-      // With TypeScript we can't directly access mock.calls, so we'll just verify the function was called
-      // The number of runners (2), the runner owner (ORG) and the runner type (Org) should all be correct,
-      // but we can't type-check this easily
+      expect(createRunners).toHaveBeenCalledWith(
+        expect.objectContaining({ runnerOwner: ORG, runnerType: 'Org' }),
+        expect.objectContaining({ numberOfRunners: 2 }),
+        expect.anything(),
+      );
     });
 
     it('Should not top up if pool size is reached including a booting instance.', async () => {
@@ -406,7 +412,7 @@ describe('Test simple pool.', () => {
         if (numberOfQueuedJobs !== undefined) {
           mockGetNumberOfQueuedJobs.mockReturnValueOnce(Promise.resolve(numberOfQueuedJobs));
         }
-        await expect(await adjust({ poolSize, dynamicPoolScalingEnabled: true })).resolves;
+        await adjust({ poolSize, dynamicPoolScalingEnabled: true });
         if (numberOfQueuedJobs === undefined) {
           expect(mockGetNumberOfQueuedJobs).not.toHaveBeenCalled();
         } else {
@@ -430,7 +436,7 @@ describe('Test simple pool.', () => {
     it('Should top up the repository runners pool', async () => {
       const runnerOwner = `${ORG}/my-repo-1`;
       process.env.RUNNER_OWNERS = runnerOwner;
-      await expect(await adjust({ poolSize: 3, dynamicPoolScalingEnabled: false })).resolves;
+      await adjust({ poolSize: 3, dynamicPoolScalingEnabled: false });
       expect(createRunners).toHaveBeenCalledTimes(1);
       expect(createRunners).toHaveBeenCalledWith(
         expect.objectContaining({ runnerOwner, runnerType: 'Repo' }),
@@ -443,7 +449,7 @@ describe('Test simple pool.', () => {
       const runnerOwner = `${ORG}/my-repo-1`;
       process.env.RUNNER_OWNERS = runnerOwner;
       mockGetNumberOfQueuedJobs.mockReturnValueOnce(Promise.resolve(3));
-      await expect(await adjust({ poolSize: 3, dynamicPoolScalingEnabled: true })).resolves;
+      await adjust({ poolSize: 3, dynamicPoolScalingEnabled: true });
       expect(createRunners).toHaveBeenCalledTimes(1);
       expect(createRunners).toHaveBeenCalledWith(
         expect.objectContaining({ runnerOwner, runnerType: 'Repo' }),
@@ -457,7 +463,7 @@ describe('Test simple pool.', () => {
     it('Should top up pools for all runner owners', async () => {
       const runnerOwners = [`${ORG}/my-repo-1`, `${ORG}/my-repo-2`];
       process.env.RUNNER_OWNERS = runnerOwners.join(',');
-      await expect(await adjust({ poolSize: 3, dynamicPoolScalingEnabled: false })).resolves;
+      await adjust({ poolSize: 3, dynamicPoolScalingEnabled: false });
       expect(createRunners).toHaveBeenCalledTimes(2);
       for (const runnerOwner of runnerOwners) {
         expect(createRunners).toHaveBeenCalledWith(
@@ -517,15 +523,20 @@ describe('Test number of queued jobs retrieval.', () => {
 
   it('Should retrieve the number of queued jobs for the org', async () => {
     // 2 repos x 2 workflow runs x 2 queued jobs with matching labels
-    await expect(getNumberOfQueuedJobs(ghClient, ORG, 'Org', LABELS.join(','))).resolves.toBe(8);
+    const numberOfQueuedJobs = await getNumberOfQueuedJobs(ghClient, ORG, 'Org', LABELS.join(','));
+    expect(numberOfQueuedJobs).toBe(8);
   });
 
   for (const githubRepo of githubReposAccessibleToInstallation) {
     it(`Should retrieve the number of queued jobs for the repo ${githubRepo.name}`, async () => {
       // 1 repo x 2 workflow runs x 2 queued jobs with matching labels
-      await expect(
-        getNumberOfQueuedJobs(ghClient, `${githubRepo.owner.login}/${githubRepo.name}`, 'Repo', LABELS.join(',')),
-      ).resolves.toBe(4);
+      const numberOfQueuedJobs = await getNumberOfQueuedJobs(
+        ghClient,
+        `${githubRepo.owner.login}/${githubRepo.name}`,
+        'Repo',
+        LABELS.join(','),
+      );
+      expect(numberOfQueuedJobs).toBe(4);
     });
   }
 });
